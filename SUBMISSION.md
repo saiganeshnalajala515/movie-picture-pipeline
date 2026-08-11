@@ -41,3 +41,27 @@ The credential values are encrypted by GitHub. No access key ID, secret access k
 - Deployed image tag: `750afde712957f7aa01ac3ccd6bcee94ba27b5f6`
 
 Both runs completed linting, tests, ECR login, Docker build and push, Kubernetes deployment, and rollout verification successfully. The final GitHub logs show the backend and frontend deployments at `1/1` Available using the commit-tagged ECR images.
+
+## Screenshots
+
+### GitHub Actions
+
+![Backend CD workflow completed successfully](screenshots/backend-cd-success.png)
+
+![Frontend CD workflow completed successfully](screenshots/frontend-cd-success.png)
+
+### Kubernetes status
+
+![EKS node and CoreDNS status](screenshots/eks-node-coredns.png)
+
+![Application deployments, pods, and services](screenshots/eks-applications-services.png)
+
+### Application results
+
+![Backend movies API response](screenshots/backend-api.png)
+
+![Frontend movie catalog](screenshots/frontend-movies1.png)
+
+![Frontend movie catalog continued](screenshots/frontend-movies2.png)
+
+![Frontend movie catalog continued](screenshots/frontend-movies3.png)
