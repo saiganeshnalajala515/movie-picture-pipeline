@@ -1,0 +1,143 @@
+name: Frontend Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "starter/frontend/**"
+      - ".github/workflows/frontend-cd.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-staging
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: cluster
+  ECR_REPOSITORY: frontend
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: starter/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: starter/frontend/.nvmrc
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-frontend-npm-
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: starter/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: starter/frontend/.nvmrc
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-frontend-npm-
+      - run: npm ci
+      - run: npm run test
+        env:
+          CI: "true"
+
+  build-and-push:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      image-uri: ${{ steps.image.outputs.uri }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        env:
+          BACKEND_API_URL: ${{ vars.BACKEND_API_URL }}
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          test -n "$BACKEND_API_URL" || { echo "Set repository variable BACKEND_API_URL"; exit 1; }
+          test -n "$AWS_KEY" || { echo "Set repository secret AWS_ACCESS_KEY_ID"; exit 1; }
+          test -n "$AWS_SECRET" || { echo "Set repository secret AWS_SECRET_ACCESS_KEY"; exit 1; }
+      - name: Configure AWS credentials from GitHub Secrets
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - id: image
+        name: Build and push commit image
+        working-directory: starter/frontend
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          BACKEND_API_URL: ${{ vars.BACKEND_API_URL }}
+        run: |
+          IMAGE_URI="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --build-arg "REACT_APP_MOVIE_API_URL=$BACKEND_API_URL" --tag "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials from GitHub Secrets
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Configure Kubernetes
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
+      - name: Deploy tagged image
+        working-directory: starter/frontend/k8s
+        env:
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
+        run: |
+          sed -i "s|image: .*|image: $IMAGE_URI|" deployment.yaml
+          kubectl apply -k .
+          kubectl rollout status deployment/frontend --timeout=5m
+          kubectl get deployment,pod,service -l app=frontend -o wide
+
+  report-failure:
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    needs: [lint, test, build-and-push, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "## Frontend deployment failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Inspect the failed job; no later deployment job was allowed to continue." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
