@@ -71,3 +71,5 @@ GitHub Actions uses a dedicated IAM deployment user because the Udacity lab bloc
 - Repository variable: `BACKEND_API_URL`
 
 Credential values are stored only as encrypted GitHub Secrets and are not committed to the repository.
+
+The lab also blocks inline IAM user policies. I attached the AWS-managed `AmazonEC2ContainerRegistryPowerUser` policy for ECR login and image push, plus `AmazonEKSWorkerNodePolicy` for `eks:DescribeCluster`. Kubernetes write access is limited separately by the EKS access entry for the `default` namespace.

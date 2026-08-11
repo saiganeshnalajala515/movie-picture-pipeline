@@ -337,37 +337,14 @@ resource "aws_iam_user" "github_actions" {
   name = "github-action-user"
 }
 
-resource "aws_iam_user_policy" "github_actions" {
-  name   = "movie-pipeline-deploy"
-  user   = aws_iam_user.github_actions.name
-  policy = data.aws_iam_policy_document.github_policy.json
+resource "aws_iam_user_policy_attachment" "github_actions_ecr" {
+  user       = aws_iam_user.github_actions.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
 }
 
-data "aws_iam_policy_document" "github_policy" {
-  statement {
-    sid       = "EcrLogin"
-    effect    = "Allow"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-  statement {
-    sid    = "PushApplicationImages"
-    effect = "Allow"
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:CompleteLayerUpload",
-      "ecr:InitiateLayerUpload",
-      "ecr:PutImage",
-      "ecr:UploadLayerPart",
-    ]
-    resources = [aws_ecr_repository.frontend.arn, aws_ecr_repository.backend.arn]
-  }
-  statement {
-    sid       = "DescribeCluster"
-    effect    = "Allow"
-    actions   = ["eks:DescribeCluster"]
-    resources = [aws_eks_cluster.main.arn]
-  }
+resource "aws_iam_user_policy_attachment" "github_actions_eks" {
+  user       = aws_iam_user.github_actions.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
 resource "aws_eks_access_entry" "github_actions" {

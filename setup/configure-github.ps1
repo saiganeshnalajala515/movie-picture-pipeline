@@ -43,6 +43,18 @@ try {
         throw "The Terraform-managed IAM user github-action-user was not found."
     }
 
+    # The lab blocks inline user policies but permits these AWS-managed policies.
+    Invoke-AwsJson -Arguments @(
+        "iam", "attach-user-policy",
+        "--user-name", $userName,
+        "--policy-arn", "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+    ) | Out-Null
+    Invoke-AwsJson -Arguments @(
+        "iam", "attach-user-policy",
+        "--user-name", $userName,
+        "--policy-arn", "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+    ) | Out-Null
+
     $entries = @((Invoke-AwsJson -Arguments @("eks", "list-access-entries", "--cluster-name", $ClusterName)).accessEntries)
     if ($entries -notcontains $userArn) {
         Invoke-AwsJson -Arguments @(
@@ -86,6 +98,7 @@ try {
     Write-Host "GitHub Actions configuration completed."
     Write-Host "Configured encrypted secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
     Write-Host "Configured variable: BACKEND_API_URL"
+    Write-Host "Attached ECR push and EKS describe permissions to $userName."
     Write-Host "No credential values were written to the repository."
 } finally {
     Clear-Variable newKey -ErrorAction SilentlyContinue

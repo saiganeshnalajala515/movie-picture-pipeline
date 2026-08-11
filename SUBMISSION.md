@@ -33,3 +33,11 @@ Frontend application:  HTTP 200
 - Repository variable `BACKEND_API_URL`
 
 The credential values are encrypted by GitHub. No access key ID, secret access key, or session token value is included in any workflow or source file.
+
+## Successful deployment evidence
+
+- Backend CD run: [Backend Continuous Deployment #1](https://github.com/saiganeshnalajala515/movie-picture-pipeline/actions/runs/31509484946)
+- Frontend CD run: [Frontend Continuous Deployment #1](https://github.com/saiganeshnalajala515/movie-picture-pipeline/actions/runs/31509485135)
+- Deployed image tag: `750afde712957f7aa01ac3ccd6bcee94ba27b5f6`
+
+Both runs completed linting, tests, ECR login, Docker build and push, Kubernetes deployment, and rollout verification successfully. The final GitHub logs show the backend and frontend deployments at `1/1` Available using the commit-tagged ECR images.

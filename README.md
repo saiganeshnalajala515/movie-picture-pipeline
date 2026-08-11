@@ -48,7 +48,7 @@ The frontend calls the backend `/movies` endpoint and displays the movie list. B
 - ECR images tagged with the Git commit SHA
 - Kubernetes deployment with rollout verification
 - Encrypted GitHub Actions Secrets for AWS authentication
-- Terraform for the VPC, ECR, EKS, IAM, node group, and GitHub deployment role
+- Terraform for the VPC, ECR, EKS, IAM, node group, and GitHub deployment user
 - Failure summaries in GitHub Actions
 
 ## CI/CD workflow
@@ -95,7 +95,7 @@ For the existing Udacity cluster, the repository settings can be configured with
 & ".\setup\configure-github.ps1"
 ```
 
-This script creates or updates the dedicated deployment user, stores a new key pair directly in GitHub Actions Secrets, configures Kubernetes access, and sets the backend URL. It does not print or commit credential values.
+This script uses the Terraform-managed deployment user, attaches the lab-supported ECR and EKS policies, stores a new key pair directly in GitHub Actions Secrets, configures Kubernetes access, and sets the backend URL. It does not print or commit credential values.
 
 ## Infrastructure setup
 
